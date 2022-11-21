@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'token.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const String token = Token.token;
 
@@ -61,12 +62,23 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final String readRepositories = """
   query ReadRepositories(\$nRepositories: Int!) {
-    viewer {
-      repositories(last: \$nRepositories) {
-        nodes {
-          id
-          name
-          viewerHasStarred
+    search(query:"is:public sort:stars-desc", type:REPOSITORY, first: \$nRepositories) {
+      repositoryCount
+      pageInfo{
+        startCursor
+        endCursor
+      }
+      edges{
+        node{
+          ... on Repository{
+            url
+            name
+            nameWithOwner
+            stargazerCount
+            forkCount
+            description
+            shortDescriptionHTML
+          }
         }
       }
     }
@@ -84,7 +96,7 @@ class _MyHomePageState extends State<MyHomePage> {
           options: QueryOptions(
             document: gql(readRepositories),
             variables: const {
-              "nRepositories": 10,
+              "nRepositories": 20,
             },
             pollInterval: const Duration(seconds: 1000),
             fetchPolicy: FetchPolicy.cacheAndNetwork,
@@ -99,8 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
               return const Text('Loading');
             }
 
-            List? repositories =
-                result.data?['viewer']?['repositories']?['nodes'];
+            List? repositories = result.data?['search']?['edges'];
 
             if (repositories == null) {
               return const Text('No repositories');
@@ -110,8 +121,73 @@ class _MyHomePageState extends State<MyHomePage> {
                 itemCount: repositories.length,
                 itemBuilder: (context, index) {
                   final repository = repositories[index];
+                  final Uri url = Uri.parse(repository['node']?['url']);
 
-                  return Text(repository['name'] ?? '');
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 10),
+                    child: InkWell(
+                      onTap: () => {launchUrl(url)},
+                      child: Ink(
+                        color: Colors.grey,
+                        width: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              repository['node']?['name'] ?? '',
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            Text(repository['node']?['nameWithOwner'] ?? ''),
+                            Text(repository['node']?['shortDescriptionHTML'] ??
+                                ''),
+                            SizedBox(
+                              width: double.infinity,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                textDirection: TextDirection.rtl,
+                                children: [
+                                  Container(
+                                    color: Colors.yellow,
+                                    child: Row(
+                                      children: <Widget>[
+                                        const Text("Stars: "),
+                                        Text(repository['node']
+                                                    ?['stargazerCount']
+                                                .toString() ??
+                                            ''),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    width: 5,
+                                  ),
+                                  Container(
+                                    color: Colors.black,
+                                    child: Row(
+                                      children: <Widget>[
+                                        const Text(
+                                          "Forks: ",
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        Text(
+                                          repository['node']?['forkCount']
+                                                  .toString() ??
+                                              '',
+                                          style: const TextStyle(
+                                              color: Colors.white),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
                 });
           },
         ),
