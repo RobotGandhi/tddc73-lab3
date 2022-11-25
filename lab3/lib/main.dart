@@ -61,8 +61,8 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final String readRepositories = """
-  query ReadRepositories(\$nRepositories: Int!) {
-    search(query:"is:public sort:stars-desc", type:REPOSITORY, first: \$nRepositories) {
+  query ReadRepositories(\$nRepositories: Int!, \$query: String!) {
+    search(query:\$query, type:REPOSITORY, first: \$nRepositories) {
       repositoryCount
       pageInfo{
         startCursor
@@ -85,6 +85,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 """;
 
+  String? language = "python";
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -95,8 +97,9 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Query(
           options: QueryOptions(
             document: gql(readRepositories),
-            variables: const {
+            variables: {
               "nRepositories": 20,
+              "query": "is:public sort:stars-desc language:$language"
             },
             pollInterval: const Duration(seconds: 1000),
             fetchPolicy: FetchPolicy.cacheAndNetwork,
@@ -117,78 +120,110 @@ class _MyHomePageState extends State<MyHomePage> {
               return const Text('No repositories');
             }
 
-            return ListView.builder(
-                itemCount: repositories.length,
-                itemBuilder: (context, index) {
-                  final repository = repositories[index];
-                  final Uri url = Uri.parse(repository['node']?['url']);
+            return Column(children: [
+              Container(
+                  width: double.infinity,
+                  child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: const BoxDecoration(
+                          color: Color.fromARGB(255, 202, 202, 202)),
+                      child: DropdownButton(
+                          value: language,
+                          borderRadius: BorderRadius.circular(10),
+                          items: const [
+                            DropdownMenuItem(
+                                value: "python", child: Text("Python")),
+                            DropdownMenuItem(
+                                value: "javascript", child: Text("JavaScript")),
+                            DropdownMenuItem(value: "c++", child: Text("C++")),
+                            DropdownMenuItem(value: "c#", child: Text("C#")),
+                            DropdownMenuItem(
+                                value: "dart", child: Text("Dart")),
+                          ],
+                          onChanged: ((value) {
+                            setState(() {
+                              language = value;
+                              refetch;
+                            });
+                          })))),
+              Expanded(
+                  child: ListView.builder(
+                      itemCount: repositories.length,
+                      itemBuilder: (context, index) {
+                        final repository = repositories[index];
+                        final Uri url = Uri.parse(repository['node']?['url']);
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 10),
-                    child: InkWell(
-                      onTap: () => {launchUrl(url)},
-                      child: Ink(
-                        color: Colors.grey,
-                        width: double.infinity,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              repository['node']?['name'] ?? '',
-                              style: const TextStyle(fontSize: 20),
-                            ),
-                            Text(repository['node']?['nameWithOwner'] ?? ''),
-                            Text(repository['node']?['shortDescriptionHTML'] ??
-                                ''),
-                            SizedBox(
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 10),
+                          child: InkWell(
+                            onTap: () => {launchUrl(url)},
+                            child: Ink(
+                              color: Colors.grey,
                               width: double.infinity,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                textDirection: TextDirection.rtl,
-                                children: [
-                                  Container(
-                                    color: Colors.yellow,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    repository['node']?['name'] ?? '',
+                                    style: const TextStyle(fontSize: 20),
+                                  ),
+                                  Text(repository['node']?['nameWithOwner'] ??
+                                      ''),
+                                  Text(repository['node']
+                                          ?['shortDescriptionHTML'] ??
+                                      ''),
+                                  SizedBox(
+                                    width: double.infinity,
                                     child: Row(
-                                      children: <Widget>[
-                                        const Text("Stars: "),
-                                        Text(repository['node']
-                                                    ?['stargazerCount']
-                                                .toString() ??
-                                            ''),
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      textDirection: TextDirection.rtl,
+                                      children: [
+                                        Container(
+                                          color: Colors.yellow,
+                                          child: Row(
+                                            children: <Widget>[
+                                              const Text("Stars: "),
+                                              Text(repository['node']
+                                                          ?['stargazerCount']
+                                                      .toString() ??
+                                                  ''),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(
+                                          width: 5,
+                                        ),
+                                        Container(
+                                          color: Colors.black,
+                                          child: Row(
+                                            children: <Widget>[
+                                              const Text(
+                                                "Forks: ",
+                                                style: TextStyle(
+                                                    color: Colors.white),
+                                              ),
+                                              Text(
+                                                repository['node']?['forkCount']
+                                                        .toString() ??
+                                                    '',
+                                                style: const TextStyle(
+                                                    color: Colors.white),
+                                              ),
+                                            ],
+                                          ),
+                                        )
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(
-                                    width: 5,
-                                  ),
-                                  Container(
-                                    color: Colors.black,
-                                    child: Row(
-                                      children: <Widget>[
-                                        const Text(
-                                          "Forks: ",
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                                        Text(
-                                          repository['node']?['forkCount']
-                                                  .toString() ??
-                                              '',
-                                          style: const TextStyle(
-                                              color: Colors.white),
-                                        ),
-                                      ],
-                                    ),
-                                  )
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                });
+                          ),
+                        );
+                      }))
+            ]);
           },
         ),
       ),
